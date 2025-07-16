@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>micro:bit Bluetooth コントローラー</title>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+      text-align: center;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 50px 20px;
+    }
+    h1 {
+      margin-bottom: 30px;
+    }
+    .status {
+      font-size: 22px;
+      margin-bottom: 30px;
+      color: yellow;
+    }
+    .connect-btn {
+      width: 300px;
+      height: 70px;
+      font-size: 26px;
+      margin-bottom: 40px;
+      background-color: #2196F3;
+      border: none;
+      border-radius: 10px;
+      color: white;
+      cursor: pointer;
+    }
+    .control-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-gap: 30px;
+      justify-items: center;
+      align-items: center;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .control-buttons button {
+      width: 120px;
+      height: 120px;
+      font-size: 32px;
+      border-radius: 20px;
+      border: none;
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 5px #2e7d32;
+    }
+    .control-buttons button:active {
+      box-shadow: none;
+      transform: translateY(4px);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>micro:bit Bluetooth コントローラー</h1>
+
+  <button class="connect-btn" onclick="connectBluetooth()">🔗 Bluetooth接続</button>
+  <div class="status" id="status">未接続</div>
+
+  <div class="control-buttons">
+    <div></div>
+    <button onclick="sendCommand('forward')">↑<br>前</button>
+    <div></div>
+
+    <button onclick="sendCommand('left')">←<br>左</button>
+    <div></div>
+    <button onclick="sendCommand('right')">→<br>右</button>
+
+    <div></div>
+    <button onclick="sendCommand('back')">↓<br>後</button>
+    <div></div>
+  </div>
+
+  <script>
+    let bluetoothDevice;
+    let bluetoothCharacteristic;
+
+    async function connectBluetooth() {
+      try {
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+          // micro:bitのフルネーム「BBC micro:bit」でフィルターをかけます
+          filters: [{
+            namePrefix: 'BBC micro:bit'
+          }],
+          optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] // UARTサービスUUID
+        });
+
+        const server = await bluetoothDevice.gatt.connect();
+        const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+        bluetoothCharacteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e'); // RX Characteristic
+
+        document.getElementById('status').innerText = '✅ 接続済み';
+        document.getElementById('status').style.color = 'lightgreen';
+
+        // 切断時の処理
+        bluetoothDevice.addEventListener('gattserverdisconnected', () => {
+          document.getElementById('status').innerText = '❌ 接続解除';
+          document.getElementById('status').style.color = 'red';
+          bluetoothCharacteristic = null;
+          bluetoothDevice = null;
+        });
+      } catch (error) {
+        console.error(error);
+        document.getElementById('status').innerText = '❌ 接続失敗';
+        document.getElementById('status').style.color = 'red';
+      }
+    }
+
+    async function sendCommand(command) {
+      if (!bluetoothCharacteristic) {
+        alert("Bluetoothが接続されていません！");
+        return;
+      }
+
+      const encoder = new TextEncoder();
+      try {
+        await bluetoothCharacteristic.writeValue(encoder.encode(command + "\n"));
+        console.log("送信: " + command);
+      } catch (error) {
+        console.error("送信エラー:", error);
+        alert("コマンド送信中にエラーが発生しました。");
+      }
+    }
+  </script>
+
+</body>
+</html>
